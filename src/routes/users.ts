@@ -1,9 +1,18 @@
+import { PrismaClient } from '@prisma/client';
 import express from 'express';
-var router = express.Router();
+
+const router = express.Router();
+const prisma = new PrismaClient();
 
 /* GET users listing. */
-router.get('/', function(req, res, next) {
-  res.send('respond with a resource');
+router.get('/users', async (req, res) => {
+  try {
+    const users = await prisma.user.findMany();
+    res.status(200).json(users);
+  } catch (error: any) {
+    res.status(500).json({message: 'Internal server error'})
+  }
+  
 });
 
-export default router;
+export {router as userRoutes};
