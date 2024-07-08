@@ -4,10 +4,10 @@ import { TokenSet, UserinfoResponse } from 'openid-client';
 import dotenv from 'dotenv'
 import { CustomRequest } from './routes/auth';
 import authRouter from './routes/auth';
+import cors from 'cors'
 
 dotenv.config();
 
-// Extend express-session types
 declare module 'express-session' {
   interface SessionData {
     tokenSet?: TokenSet;
@@ -17,26 +17,26 @@ declare module 'express-session' {
 
 const app = express();
 
+app.use(cors({
+  origin: 'http://localhost:8000',
+  credentials: true
+}))
+
 app.use(session({
   secret: process.env.SESSION_SECRET || '',
   resave: false,
-  saveUninitialized: true
+  saveUninitialized: true,
+  cookie: { 
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict' 
+  }
 }));
 
-function ensureAuthenticated(req: CustomRequest, res: Response, next: NextFunction) {
-  if (req.session.userInfo) {
-    return next();
-  }
-  res.redirect('/login');
-}
-
-app.get('/protected', ensureAuthenticated, (req: Request, res: Response) => {
-  res.send('This is a protected route');
-});
+app.use('/', authRouter);
 
 async function startServer() {
-  app.use('/', authRouter);
-
   app.listen(3000, () => {
     console.log('Server running on http://localhost:3000');
   });

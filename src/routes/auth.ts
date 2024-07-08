@@ -1,4 +1,4 @@
-import express, {Request, Response} from 'express'
+import express, {NextFunction, Request, Response} from 'express'
 import session from 'express-session';
 import { Client, Issuer, TokenSet, UserinfoResponse } from 'openid-client';
 
@@ -28,9 +28,10 @@ const params = {
   scope: 'openid profile email'
 };
 
-router.get('/login', async (req: Request, res: Response) => {
+router.get('/api/login', async (req: Request, res: Response) => {
   const client = await configureOIDC();
-  res.redirect(client.authorizationUrl(params));
+  const authUrl = client.authorizationUrl(params);
+  res.redirect(authUrl);
 });
 
 router.get('/auth/callback', async (req: CustomRequest, res: Response) => {
@@ -38,23 +39,41 @@ router.get('/auth/callback', async (req: CustomRequest, res: Response) => {
   const tokenSet = await client.callback('http://localhost:3000/auth/callback', req.query as any);
   req.session.tokenSet = tokenSet;
   req.session.userInfo = await client.userinfo(tokenSet.access_token!);
-  res.redirect('/');
 });
 
 router.get('/', (req: CustomRequest, res: Response) => {
-  if (!req.session.userInfo) {
-    return res.redirect('/login');
-  }
-  res.json(req.session.userInfo);
+    if (!req.session.userInfo) {
+      return res.redirect('http://localhost:8000/login');
+      }
+  res.json({
+    userInfo: req.session.userInfo,
+  });
 });
 
-router.get('/logout', (req: CustomRequest, res: Response) => {
+router.get('/api/logout', (req: CustomRequest, res: Response) => {
   req.session.destroy((err) => {
     if (err) {
       console.error('Error destroying session:', err);
     }
-    res.redirect('/');
+    res.clearCookie('session_token');
+    res.clearCookie('connect.sid'); 
+    res.redirect('http://localhost:8000/login');
   });
+});
+
+function ensureAuthenticated(req: CustomRequest, res: Response, next: NextFunction) {
+  if (req.session.userInfo) {
+    return next();
+  }
+  res.redirect('http://localhost:8000/login');
+}
+
+router.get('/check-auth', (req: Request, res: Response) => {
+  if (req.session.userInfo) {
+    res.send({ isAuthenticated: true });
+  } else {
+    res.send({ isAuthenticated: false });
+  }
 });
 
 export default router
